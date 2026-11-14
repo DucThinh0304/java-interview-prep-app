@@ -1,0 +1,43 @@
+[
+  {
+    "id": "lesson_jvm_string_pool",
+    "topicId": "jvm-internals",
+    "title": "String Immutability & The Intern Pool",
+    "durationMinutes": 1,
+    "contentMarkdown": "Strings in Java are immutable value objects backed by byte arrays. String literals are automatically pooled in the JVM String Constant Pool on the heap.\n\nCalling `new String(\"val\")` forces a new heap allocation, whereas `\"val\".intern()` returns the canonical reference from the pool.",
+    "keyTakeaways": [
+      "String pool lives in heap memory since Java 7.",
+      "String literals share references automatically.",
+      "Avoid redundant new String(\"...\") allocations in hot loops."
+    ],
+    "quiz": [
+      {
+        "type": "io.github.ducthinh0304.javainterviewprep.core.model.Exercise.MultipleChoice",
+        "id": "quiz_string_intern_01",
+        "topicId": "jvm-internals",
+        "difficulty": "JUNIOR",
+        "prompt": "Given: String a = \"dev\"; String b = new String(\"dev\"); What does (a == b) evaluate to?",
+        "codeSnippet": "String a = \"dev\";\nString b = new String(\"dev\");\nboolean res = (a == b);",
+        "explanation": "'a' points to the string literal in the constant pool, while 'b' is a newly created instance on the heap. Reference equality (==) returns false.",
+        "tags": ["strings", "jvm"],
+        "options": [
+          {
+            "id": "opt_1",
+            "text": "false, because 'b' references a distinct heap instance while 'a' references the pool",
+            "isCorrect": true
+          },
+          {
+            "id": "opt_2",
+            "text": "true, because the compiler automatically deduplicates identical string contents",
+            "isCorrect": false
+          },
+          {
+            "id": "opt_3",
+            "text": "Compile-time error",
+            "isCorrect": false
+          }
+        ]
+      }
+    ]
+  }
+]
