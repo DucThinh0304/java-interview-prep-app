@@ -15,6 +15,7 @@ data class UserStatsEntity(
     val totalXp: Int = 0,
     val currentStreak: Int = 0,
     val longestStreak: Int = 0,
+    /** Last checked-in day (first completed quiz of that day). */
     val lastActiveDate: LocalDate? = null,
     val bestCombo: Double = 1.0
 )

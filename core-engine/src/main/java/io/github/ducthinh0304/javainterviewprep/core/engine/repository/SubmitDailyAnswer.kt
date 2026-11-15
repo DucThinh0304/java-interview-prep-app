@@ -8,8 +8,9 @@ import java.time.LocalDate
 import javax.inject.Inject
 
 /**
- * Records a daily answer atomically: question stat, XP/streak/activity and the daily_answer row
- * either all land or none do (e.g. if the ViewModel scope is cancelled mid-save).
+ * Records a daily answer atomically: question stat, XP/activity, the daily_answer row and the
+ * quiz completion (the daily is a one-question quiz, so it checks the day in). All of them
+ * land or none do (e.g. if the ViewModel scope is cancelled mid-save).
  * Returns the XP earned.
  */
 class SubmitDailyAnswer @Inject constructor(
@@ -27,6 +28,7 @@ class SubmitDailyAnswer @Inject constructor(
             progressRepository.recordDailyAnswer(
                 LocalDate.now(clock), question.id, selectedOptionIndex, isCorrect, earnedXp
             )
+            statsRepository.recordQuizCompleted()
             earnedXp
         }
 }

@@ -13,7 +13,9 @@ import java.time.LocalDate
 data class DailyActivityEntity(
     @PrimaryKey val date: LocalDate,
     val xpEarned: Int = 0,
-    val questionsAnswered: Int = 0
+    val questionsAnswered: Int = 0,
+    /** A day counts as checked in for the streak once this is >= 1. */
+    val quizzesCompleted: Int = 0
 )
 
 @Dao

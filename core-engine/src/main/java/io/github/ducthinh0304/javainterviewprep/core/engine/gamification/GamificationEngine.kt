@@ -60,8 +60,7 @@ class GamificationEngine @Inject constructor() {
     fun applyAnswerResult(
         currentStats: UserStats,
         difficulty: Difficulty,
-        isCorrect: Boolean,
-        todayEpochDay: Long
+        isCorrect: Boolean
     ): Pair<UserStats, Int> {
         val (newConsecutive, newCombo) = calculateNextCombo(
             currentConsecutive = currentStats.consecutiveCorrectAnswers,
@@ -74,20 +73,10 @@ class GamificationEngine @Inject constructor() {
             0
         }
 
-        val (newStreak, newHighest) = calculateStreak(
-            currentStreak = currentStats.currentStreak,
-            highestStreak = currentStats.highestStreak,
-            lastActiveEpochDay = currentStats.lastActiveEpochDay,
-            todayEpochDay = todayEpochDay
-        )
-
         val updatedStats = currentStats.copy(
             xp = currentStats.xp + earnedXp,
-            currentStreak = newStreak,
-            highestStreak = newHighest,
             comboMultiplier = newCombo,
             consecutiveCorrectAnswers = newConsecutive,
-            lastActiveEpochDay = todayEpochDay,
             totalExercisesAnswered = currentStats.totalExercisesAnswered + 1,
             totalCorrectAnswers = currentStats.totalCorrectAnswers + if (isCorrect) 1 else 0
         )

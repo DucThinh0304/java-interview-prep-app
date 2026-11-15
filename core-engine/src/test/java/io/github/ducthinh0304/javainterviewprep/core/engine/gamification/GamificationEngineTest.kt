@@ -71,8 +71,7 @@ class GamificationEngineTest {
         val (updated, earnedXp) = engine.applyAnswerResult(
             currentStats = initial,
             difficulty = Difficulty.MEDIUM,
-            isCorrect = true,
-            todayEpochDay = 20000L
+            isCorrect = true
         )
 
         assertEquals(20, earnedXp)

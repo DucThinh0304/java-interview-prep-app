@@ -30,6 +30,16 @@
           "prompt": "Fixture prompt two?",
           "options": ["A", "B"],
           "correctIndex": 1
+        },
+        {
+          "type": "FillBlank",
+          "id": "q_fixture_3",
+          "unitId": "unit_fixture",
+          "difficulty": "EASY",
+          "tags": [],
+          "explanation": "Fixture explanation three.",
+          "prompt": "Fixture ___ three.",
+          "acceptedAnswers": ["blank"]
         }
       ]
     }
