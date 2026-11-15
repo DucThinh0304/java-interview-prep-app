@@ -30,5 +30,14 @@ RULES
 - Simple, readable code. No unused dependencies. Verify any new library's maintenance status (recent releases, open issues) before adding it.
 - Every step must compile and run before you stop. Unit tests for all non-UI logic.
 - Original content only. No copying questions, explanations or UI copy from other apps or websites.
-- Ask before big architectural changes. Keep CHANGELOG.md with one line per completed step.
+- Ask before big architectural changes. Do not create or edit CHANGELOG.md. When a step is finished, use the `pre-commit` skill (.claude/skills/pre-commit) before suggesting a Conventional Commits message.
 - Never create a git commit after finishing work, even if the step compiles and tests pass. Run the relevant tests, report the results, and leave the changes uncommitted so I can review and commit myself.
+
+ENGINEERING RULES (learned the hard way)
+- Room: any entity change means bumping `EngineDatabase.version`. Pre-release we use `fallbackToDestructiveMigration(dropAllTables = true)`. Write real Migrations and turn on `exportSchema` before the first public release.
+- Writes that touch more than one table go in a single `database.withTransaction {}` in :core-engine (see `SubmitDailyAnswer`), never as separate calls from a ViewModel.
+- Time: inject `java.time.Clock`. Never call `now()` without it, in ViewModels or repositories.
+- UI guards (e.g. "already answered") are set synchronously, before `viewModelScope.launch`, so double-taps are no-ops.
+
+AGENT FILES
+- Rules that are always true go here and stay short. Procedures go in `.claude/skills/<name>/SKILL.md`, one folder per workflow, with any script it needs inside that folder. A new lesson goes into the skill it belongs to; don't add new top-level files or scripts.

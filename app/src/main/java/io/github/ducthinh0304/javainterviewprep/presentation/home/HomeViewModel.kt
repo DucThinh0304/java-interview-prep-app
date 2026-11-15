@@ -6,7 +6,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.AnswerEvaluator
 import io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.EvaluationResult
 import io.github.ducthinh0304.javainterviewprep.core.engine.repository.ContentRepository
-import io.github.ducthinh0304.javainterviewprep.core.engine.repository.UserProgressRepository
+import io.github.ducthinh0304.javainterviewprep.core.engine.repository.ProgressRepository
+import io.github.ducthinh0304.javainterviewprep.core.engine.repository.StatsRepository
+import io.github.ducthinh0304.javainterviewprep.core.engine.repository.SubmitDailyAnswer
 import io.github.ducthinh0304.javainterviewprep.core.model.Note
 import io.github.ducthinh0304.javainterviewprep.core.model.Question
 import io.github.ducthinh0304.javainterviewprep.core.model.UserStats
@@ -14,7 +16,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -32,8 +37,11 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val contentRepository: ContentRepository,
-    private val userProgressRepository: UserProgressRepository,
-    private val answerEvaluator: AnswerEvaluator
+    private val progressRepository: ProgressRepository,
+    private val statsRepository: StatsRepository,
+    private val answerEvaluator: AnswerEvaluator,
+    private val submitDailyAnswer: SubmitDailyAnswer,
+    private val clock: Clock
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -46,14 +54,20 @@ class HomeViewModel @Inject constructor(
 
     private fun loadData() {
         viewModelScope.launch {
-            val todayEpochDay = LocalDate.now().toEpochDay()
-            val pack = contentRepository.getPack("java")
-            val daily = contentRepository.getDailyQuestion(todayEpochDay, "java")
+            val today = LocalDate.now(clock)
+            val pack = contentRepository.getPack()
+            val daily = contentRepository.getDailyQuestion(today.toEpochDay())
+            // Restore today's answer so a restart can't re-answer (and re-earn XP for) the daily.
+            val saved = progressRepository.dailyAnswer(today).first()
+                ?.takeIf { daily != null && it.questionId == daily.id }
 
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 dailyQuestion = daily,
-                notes = pack.allNotes()
+                notes = pack.allNotes(),
+                selectedOptionIndex = saved?.selectedOptionIndex,
+                evaluationResult = if (daily != null && saved != null) evaluate(daily, saved.selectedOptionIndex) else null,
+                lastEarnedXp = saved?.xpEarned
             )
         }
     }
@@ -61,10 +75,10 @@ class HomeViewModel @Inject constructor(
     private fun observeProgress() {
         viewModelScope.launch {
             combine(
-                userProgressRepository.userStatsFlow,
-                userProgressRepository.reviewQueueFlow
-            ) { stats, queue ->
-                Pair(stats, queue.size)
+                statsRepository.userStatsFlow,
+                progressRepository.dueQuestions(Instant.now(clock))
+            ) { stats, dueQuestions ->
+                Pair(stats, dueQuestions.size)
             }.collect { (stats, queueCount) ->
                 _uiState.value = _uiState.value.copy(
                     stats = stats,
@@ -76,29 +90,24 @@ class HomeViewModel @Inject constructor(
 
     fun selectOption(optionIndex: Int) {
         val daily = _uiState.value.dailyQuestion ?: return
-        if (_uiState.value.evaluationResult != null) return // Already submitted
-
-        val result = when (daily) {
-            is Question.SingleChoice -> answerEvaluator.evaluateSingleChoice(daily, optionIndex)
-            is Question.PredictOutput -> answerEvaluator.evaluatePredictOutput(daily, optionIndex)
-            else -> return
-        }
-
-        val todayEpochDay = LocalDate.now().toEpochDay()
+        // Lock synchronously, before the DB writes start, so a fast double-tap is a no-op.
+        if (_uiState.value.selectedOptionIndex != null) return
+        val result = evaluate(daily, optionIndex) ?: return
+        _uiState.value = _uiState.value.copy(selectedOptionIndex = optionIndex)
 
         viewModelScope.launch {
-            val (_, earnedXp) = userProgressRepository.recordAttempt(
-                exerciseId = daily.id,
-                difficulty = daily.difficulty,
-                isCorrect = result.isCorrect,
-                todayEpochDay = todayEpochDay
-            )
+            val earnedXp = submitDailyAnswer(daily, optionIndex, result.isCorrect)
 
             _uiState.value = _uiState.value.copy(
-                selectedOptionIndex = optionIndex,
                 evaluationResult = result,
                 lastEarnedXp = earnedXp
             )
         }
+    }
+
+    private fun evaluate(question: Question, optionIndex: Int): EvaluationResult? = when (question) {
+        is Question.SingleChoice -> answerEvaluator.evaluateSingleChoice(question, optionIndex)
+        is Question.PredictOutput -> answerEvaluator.evaluatePredictOutput(question, optionIndex)
+        else -> null
     }
 }

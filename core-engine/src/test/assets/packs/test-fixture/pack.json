@@ -1,0 +1,37 @@
+{
+  "id": "test_fixture_pack",
+  "title": "Fixture Pack",
+  "version": 1,
+  "units": [
+    {
+      "id": "unit_fixture",
+      "title": "Fixture Unit",
+      "description": "Minimal unit for ContentRepository tests.",
+      "notes": [],
+      "questions": [
+        {
+          "type": "SingleChoice",
+          "id": "q_fixture_1",
+          "unitId": "unit_fixture",
+          "difficulty": "EASY",
+          "tags": [],
+          "explanation": "Fixture explanation one.",
+          "prompt": "Fixture prompt one?",
+          "options": ["A", "B"],
+          "correctIndex": 0
+        },
+        {
+          "type": "SingleChoice",
+          "id": "q_fixture_2",
+          "unitId": "unit_fixture",
+          "difficulty": "MEDIUM",
+          "tags": [],
+          "explanation": "Fixture explanation two.",
+          "prompt": "Fixture prompt two?",
+          "options": ["A", "B"],
+          "correctIndex": 1
+        }
+      ]
+    }
+  ]
+}

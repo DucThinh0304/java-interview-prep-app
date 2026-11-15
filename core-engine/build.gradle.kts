@@ -25,6 +25,18 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
+    sourceSets {
+        getByName("test") {
+            assets.srcDirs("src/test/assets")
+        }
+    }
 }
 
 dependencies {
@@ -60,5 +72,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
