@@ -1,6 +1,0 @@
-{
-  "id": "java",
-  "title": "Java Core & JVM Internals",
-  "version": 1,
-  "description": "Developer-grade Java interview drills covering JVM memory, memory model, concurrency primitives, and modern language features."
-}

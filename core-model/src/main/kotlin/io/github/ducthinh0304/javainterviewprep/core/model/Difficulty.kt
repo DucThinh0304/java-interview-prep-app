@@ -6,12 +6,5 @@ import kotlinx.serialization.Serializable
 enum class Difficulty {
     EASY,
     MEDIUM,
-    HARD;
-
-    companion object {
-        // Backwards compatibility mappings
-        val JUNIOR: Difficulty get() = EASY
-        val MID: Difficulty get() = MEDIUM
-        val SENIOR: Difficulty get() = HARD
-    }
+    HARD
 }

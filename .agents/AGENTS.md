@@ -31,3 +31,4 @@ RULES
 - Every step must compile and run before you stop. Unit tests for all non-UI logic.
 - Original content only. No copying questions, explanations or UI copy from other apps or websites.
 - Ask before big architectural changes. Keep CHANGELOG.md with one line per completed step.
+- Never create a git commit after finishing work, even if the step compiles and tests pass. Run the relevant tests, report the results, and leave the changes uncommitted so I can review and commit myself.
