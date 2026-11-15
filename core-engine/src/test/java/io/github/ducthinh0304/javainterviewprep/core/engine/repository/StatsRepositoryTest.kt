@@ -16,6 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
+import java.time.LocalDate
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
@@ -33,6 +34,7 @@ class StatsRepositoryTest {
         ).build()
         clock = MutableClock(Instant.parse("2026-11-15T00:00:00Z"))
         repository = StatsRepository(
+            database = database,
             userStatsDao = database.userStatsDao(),
             dailyActivityDao = database.dailyActivityDao(),
             gamificationEngine = GamificationEngine(),
@@ -46,42 +48,62 @@ class StatsRepositoryTest {
     }
 
     @Test
-    fun streak_incrementsOnConsecutiveDays() = runTest {
-        val day1 = repository.recordAnswer(Difficulty.EASY, isCorrect = true).first
-        assertEquals(1, day1.currentStreak)
+    fun severalQuizzesInOneDay_countAsASingleCheckIn() = runTest {
+        repeat(3) { repository.recordQuizCompleted() }
 
-        clock.advanceByDays(1)
-        val day2 = repository.recordAnswer(Difficulty.EASY, isCorrect = true).first
-        assertEquals(2, day2.currentStreak)
-
-        clock.advanceByDays(1)
-        val day3 = repository.recordAnswer(Difficulty.EASY, isCorrect = true).first
-        assertEquals(3, day3.currentStreak)
-        assertEquals(3, day3.highestStreak)
+        assertEquals(1, database.userStatsDao().get()?.currentStreak)
+        assertEquals(3, repository.dailyActivity(LocalDate.now(clock)).first()?.quizzesCompleted)
     }
 
     @Test
-    fun streak_resetsAfterAGapDay() = runTest {
-        repository.recordAnswer(Difficulty.EASY, isCorrect = true)
-        clock.advanceByDays(1)
-        repository.recordAnswer(Difficulty.EASY, isCorrect = true)
-        clock.advanceByDays(1)
-        val beforeGap = repository.recordAnswer(Difficulty.EASY, isCorrect = true).first
-        assertEquals(3, beforeGap.currentStreak)
+    fun checkInsOnConsecutiveDays_extendTheStreak() = runTest {
+        repeat(3) { day ->
+            if (day > 0) clock.advanceByDays(1)
+            repository.recordQuizCompleted()
+            repository.recordQuizCompleted() // extra quizzes never double count
+        }
 
-        clock.advanceByDays(2) // skip a day entirely
-        val afterGap = repository.recordAnswer(Difficulty.EASY, isCorrect = true).first
-
-        assertEquals(1, afterGap.currentStreak)
-        assertEquals(3, afterGap.highestStreak) // longest streak is preserved
+        val stats = database.userStatsDao().get()!!
+        assertEquals(3, stats.currentStreak)
+        assertEquals(3, stats.longestStreak)
     }
 
     @Test
-    fun streak_doesNotDoubleIncrementWithinSameDay() = runTest {
-        repository.recordAnswer(Difficulty.EASY, isCorrect = true)
-        val secondAnswerSameDay = repository.recordAnswer(Difficulty.EASY, isCorrect = false).first
+    fun aDayWithoutACheckIn_resetsTheStreak() = runTest {
+        repository.recordQuizCompleted()
+        clock.advanceByDays(1)
+        repository.recordQuizCompleted()
 
-        assertEquals(1, secondAnswerSameDay.currentStreak)
+        clock.advanceByDays(1)
+        repository.recordAnswer(Difficulty.EASY, isCorrect = true) // answered, but no quiz completed
+        clock.advanceByDays(1)
+        repository.recordQuizCompleted()
+
+        val stats = database.userStatsDao().get()!!
+        assertEquals(1, stats.currentStreak)
+        assertEquals(2, stats.longestStreak) // longest streak is preserved
+    }
+
+    @Test
+    fun shownStreak_staysAliveUntilAFullDayIsMissed() = runTest {
+        repository.recordQuizCompleted()
+        clock.advanceByDays(1)
+        repository.recordQuizCompleted()
+
+        clock.advanceByDays(1) // not checked in yet today: still alive
+        assertEquals(2, repository.userStatsFlow.first().currentStreak)
+
+        clock.advanceByDays(1) // yesterday was missed: broken, before any new quiz
+        assertEquals(0, repository.userStatsFlow.first().currentStreak)
+        assertEquals(2, repository.userStatsFlow.first().highestStreak)
+    }
+
+    @Test
+    fun answeringWithoutCompletingAQuiz_doesNotCheckIn() = runTest {
+        repository.recordAnswer(Difficulty.EASY, isCorrect = true)
+
+        assertEquals(0, database.userStatsDao().get()?.currentStreak)
+        assertEquals(0, repository.dailyActivity(LocalDate.now(clock)).first()?.quizzesCompleted)
     }
 
     @Test
@@ -102,7 +124,7 @@ class StatsRepositoryTest {
         repository.recordAnswer(Difficulty.MEDIUM, isCorrect = true)
         repository.recordAnswer(Difficulty.EASY, isCorrect = false)
 
-        val today = java.time.LocalDate.now(clock)
+        val today = LocalDate.now(clock)
         val activity = repository.dailyActivity(today).first()
 
         assertEquals(2, activity?.questionsAnswered)
@@ -115,7 +137,6 @@ class StatsRepositoryTest {
 
         val emitted = repository.userStatsFlow.first()
         assertEquals(10, emitted.xp)
-        assertEquals(1, emitted.currentStreak)
         assertEquals(1, emitted.consecutiveCorrectAnswers)
     }
 }

@@ -1,7 +1,9 @@
 package io.github.ducthinh0304.javainterviewprep.core.engine.repository
 
+import androidx.room.withTransaction
 import io.github.ducthinh0304.javainterviewprep.core.engine.db.DailyActivityDao
 import io.github.ducthinh0304.javainterviewprep.core.engine.db.DailyActivityEntity
+import io.github.ducthinh0304.javainterviewprep.core.engine.db.EngineDatabase
 import io.github.ducthinh0304.javainterviewprep.core.engine.db.UserStatsDao
 import io.github.ducthinh0304.javainterviewprep.core.engine.db.UserStatsEntity
 import io.github.ducthinh0304.javainterviewprep.core.engine.gamification.GamificationEngine
@@ -29,6 +31,7 @@ private data class SessionStats(
 
 @Singleton
 class StatsRepository @Inject constructor(
+    private val database: EngineDatabase,
     private val userStatsDao: UserStatsDao,
     private val dailyActivityDao: DailyActivityDao,
     private val gamificationEngine: GamificationEngine,
@@ -50,16 +53,13 @@ class StatsRepository @Inject constructor(
         val (updated, earnedXp) = gamificationEngine.applyAnswerResult(
             currentStats = persisted.toDomain(sessionStats.value),
             difficulty = difficulty,
-            isCorrect = isCorrect,
-            todayEpochDay = today.toEpochDay()
+            isCorrect = isCorrect
         )
 
+        // Answering alone is not a check-in; the streak only moves in recordQuizCompleted().
         userStatsDao.upsert(
-            UserStatsEntity(
+            persisted.copy(
                 totalXp = updated.xp,
-                currentStreak = updated.currentStreak,
-                longestStreak = updated.highestStreak,
-                lastActiveDate = today,
                 bestCombo = maxOf(persisted.bestCombo, updated.comboMultiplier)
             )
         )
@@ -77,6 +77,26 @@ class StatsRepository @Inject constructor(
         return Pair(updated, earnedXp)
     }
 
+    /**
+     * Quizzes are unlimited per day. The first one completed on a day is that day's check-in
+     * (quizzesCompleted goes 0 -> 1) and is the only thing that moves the streak.
+     */
+    suspend fun recordQuizCompleted() = database.withTransaction {
+        val today = LocalDate.now(clock)
+        val activity = dailyActivityDao.get(today) ?: DailyActivityEntity(date = today)
+        dailyActivityDao.upsert(activity.copy(quizzesCompleted = activity.quizzesCompleted + 1))
+        if (activity.quizzesCompleted >= 1) return@withTransaction // already checked in today
+
+        val persisted = userStatsDao.get() ?: UserStatsEntity()
+        val (streak, longest) = gamificationEngine.calculateStreak(
+            currentStreak = persisted.currentStreak,
+            highestStreak = persisted.longestStreak,
+            lastActiveEpochDay = persisted.lastActiveDate?.toEpochDay(),
+            todayEpochDay = today.toEpochDay()
+        )
+        userStatsDao.upsert(persisted.copy(currentStreak = streak, longestStreak = longest, lastActiveDate = today))
+    }
+
     private suspend fun recordDailyActivity(date: LocalDate, xpEarned: Int) {
         val existing = dailyActivityDao.get(date)
         dailyActivityDao.upsert(
@@ -87,9 +107,13 @@ class StatsRepository @Inject constructor(
         )
     }
 
+    /** Alive while the last check-in was today or yesterday; after a missed day it shows 0 right away. */
+    private fun UserStatsEntity.isStreakAlive(): Boolean =
+        lastActiveDate?.isBefore(LocalDate.now(clock).minusDays(1)) == false
+
     private fun UserStatsEntity.toDomain(session: SessionStats): UserStats = UserStats(
         xp = totalXp,
-        currentStreak = currentStreak,
+        currentStreak = if (isStreakAlive()) currentStreak else 0,
         highestStreak = longestStreak,
         comboMultiplier = session.comboMultiplier,
         consecutiveCorrectAnswers = session.consecutiveCorrectAnswers,

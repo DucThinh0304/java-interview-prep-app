@@ -24,7 +24,7 @@ class ContentRepositoryTest {
         val pack = repository.getPack("test-fixture")
 
         assertEquals("test_fixture_pack", pack.id)
-        assertEquals(2, pack.allQuestions().size)
+        assertEquals(3, pack.allQuestions().size)
     }
 
     @Test
@@ -36,11 +36,10 @@ class ContentRepositoryTest {
     }
 
     @Test
-    fun getDailyQuestion_picksQuestionDeterministicallyByEpochDay() = runTest {
-        val pack = repository.getPack("test-fixture")
-        val questionCount = pack.allQuestions().size
+    fun getDailyQuestion_rotatesOnlyThroughAnswerableKinds() = runTest {
+        // Fixture: 2 SingleChoice + 1 FillBlank. Day 2 would land on the FillBlank without the filter.
+        val picks = (0L..3L).map { repository.getDailyQuestion(epochDay = it, packId = "test-fixture")?.id }
 
-        val daily = repository.getDailyQuestion(epochDay = 0L, packId = "test-fixture")
-        assertEquals(pack.allQuestions()[0L.mod(questionCount.toLong()).toInt()].id, daily?.id)
+        assertEquals(listOf("q_fixture_1", "q_fixture_2", "q_fixture_1", "q_fixture_2"), picks)
     }
 }

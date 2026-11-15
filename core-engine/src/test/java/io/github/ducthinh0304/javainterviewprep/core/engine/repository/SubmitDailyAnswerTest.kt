@@ -56,6 +56,7 @@ class SubmitDailyAnswerTest {
             clock = clock
         )
         statsRepository = StatsRepository(
+            database = database,
             userStatsDao = database.userStatsDao(),
             dailyActivityDao = database.dailyActivityDao(),
             gamificationEngine = GamificationEngine(),
@@ -80,6 +81,8 @@ class SubmitDailyAnswerTest {
         val daily = database.dailyAnswerDao().get(today)
         assertEquals(0, daily?.selectedOptionIndex)
         assertEquals(10, daily?.xpEarned)
+        assertEquals(1, database.dailyActivityDao().get(today)?.quizzesCompleted)
+        assertEquals(1, database.userStatsDao().get()?.currentStreak)
     }
 
     @Test
