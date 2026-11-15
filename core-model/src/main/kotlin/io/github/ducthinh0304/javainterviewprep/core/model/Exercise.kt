@@ -3,13 +3,6 @@ package io.github.ducthinh0304.javainterviewprep.core.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class Difficulty {
-    JUNIOR,
-    MID,
-    SENIOR
-}
-
-@Serializable
 data class QuizOption(
     val id: String,
     val text: String,

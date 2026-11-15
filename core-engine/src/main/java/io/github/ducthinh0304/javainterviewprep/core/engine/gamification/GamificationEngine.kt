@@ -13,9 +13,9 @@ class GamificationEngine @Inject constructor() {
 
     fun calculateBaseXp(difficulty: Difficulty): Int {
         return when (difficulty) {
-            Difficulty.JUNIOR -> 10
-            Difficulty.MID -> 20
-            Difficulty.SENIOR -> 35
+            Difficulty.EASY -> 10
+            Difficulty.MEDIUM -> 20
+            Difficulty.HARD -> 35
         }
     }
 
@@ -29,7 +29,6 @@ class GamificationEngine @Inject constructor() {
             val nextConsecutive = currentConsecutive + 1
             // Combo multiplier scales by +0.1 for every consecutive correct, capped at 2.5x
             val multiplier = min(2.5, 1.0 + (nextConsecutive * 0.1))
-            // Round to 1 decimal place
             val roundedMultiplier = (multiplier * 10).roundToInt() / 10.0
             Pair(nextConsecutive, roundedMultiplier)
         } else {

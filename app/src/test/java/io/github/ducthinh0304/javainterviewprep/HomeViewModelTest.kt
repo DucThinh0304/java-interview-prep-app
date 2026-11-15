@@ -4,10 +4,10 @@ import io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.AnswerEva
 import io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.EvaluationResult
 import io.github.ducthinh0304.javainterviewprep.core.engine.repository.ContentRepository
 import io.github.ducthinh0304.javainterviewprep.core.engine.repository.UserProgressRepository
-import io.github.ducthinh0304.javainterviewprep.core.model.ContentPack
 import io.github.ducthinh0304.javainterviewprep.core.model.Difficulty
-import io.github.ducthinh0304.javainterviewprep.core.model.Exercise
-import io.github.ducthinh0304.javainterviewprep.core.model.QuizOption
+import io.github.ducthinh0304.javainterviewprep.core.model.Pack
+import io.github.ducthinh0304.javainterviewprep.core.model.Question
+import io.github.ducthinh0304.javainterviewprep.core.model.Unit
 import io.github.ducthinh0304.javainterviewprep.core.model.UserStats
 import io.github.ducthinh0304.javainterviewprep.presentation.home.HomeViewModel
 import io.mockk.coEvery
@@ -34,25 +34,29 @@ class HomeViewModelTest {
     private val userProgressRepository = mockk<UserProgressRepository>()
     private val answerEvaluator = mockk<AnswerEvaluator>()
 
-    private val dummyExercise = Exercise.MultipleChoice(
+    private val dummyQuestion = Question.SingleChoice(
         id = "test_ex_1",
-        topicId = "topic_1",
-        difficulty = Difficulty.JUNIOR,
+        unitId = "topic_1",
+        difficulty = Difficulty.EASY,
         prompt = "Sample prompt",
         explanation = "Sample explanation",
-        options = listOf(
-            QuizOption("opt_1", "Option A", isCorrect = true),
-            QuizOption("opt_2", "Option B", isCorrect = false)
-        )
+        options = listOf("Option A", "Option B"),
+        correctIndex = 0
     )
 
-    private val dummyPack = ContentPack(
+    private val dummyPack = Pack(
         id = "java",
         title = "Java",
         version = 1,
-        description = "Test pack",
-        questions = listOf(dummyExercise),
-        lessons = emptyList()
+        units = listOf(
+            Unit(
+                id = "topic_1",
+                title = "Topic 1",
+                description = "Desc",
+                notes = emptyList(),
+                questions = listOf(dummyQuestion)
+            )
+        )
     )
 
     @Before
@@ -60,7 +64,7 @@ class HomeViewModelTest {
         Dispatchers.setMain(testDispatcher)
 
         coEvery { contentRepository.getPack(any()) } returns dummyPack
-        coEvery { contentRepository.getDailyQuestion(any(), any()) } returns dummyExercise
+        coEvery { contentRepository.getDailyQuestion(any(), any()) } returns dummyQuestion
         every { userProgressRepository.userStatsFlow } returns flowOf(UserStats(xp = 40))
         every { userProgressRepository.reviewQueueFlow } returns flowOf(emptyList())
     }
@@ -88,21 +92,21 @@ class HomeViewModelTest {
         } returns Pair(UserStats(xp = 50), 10)
 
         every {
-            answerEvaluator.evaluateMultipleChoice(dummyExercise, "opt_1")
+            answerEvaluator.evaluateSingleChoice(dummyQuestion, 0)
         } returns EvaluationResult(
             isCorrect = true,
-            selectedId = "opt_1",
+            selectedId = "0",
             explanation = "Sample explanation"
         )
 
         val viewModel = HomeViewModel(contentRepository, userProgressRepository, answerEvaluator)
         testScheduler.advanceUntilIdle()
 
-        viewModel.selectOption("opt_1")
+        viewModel.selectOption(0)
         testScheduler.advanceUntilIdle()
 
         val currentState = viewModel.uiState.value
-        assertEquals("opt_1", currentState.selectedOptionId)
+        assertEquals(0, currentState.selectedOptionIndex)
         assertEquals(true, currentState.evaluationResult?.isCorrect)
         assertEquals(10, currentState.lastEarnedXp)
     }

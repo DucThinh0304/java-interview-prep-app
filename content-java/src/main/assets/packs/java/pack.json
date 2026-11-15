@@ -1,0 +1,205 @@
+{
+  "id": "java_core_pack",
+  "title": "Java Core, Memory Model & Modern Concurrency",
+  "version": 1,
+  "units": [
+    {
+      "id": "unit_java_concurrency",
+      "title": "Java Memory Model & Concurrency Primitives",
+      "description": "Core memory visibility guarantees, synchronizers, lock-free patterns, and modern Project Loom virtual threads.",
+      "notes": [
+        {
+          "id": "note_jmm_visibility",
+          "title": "Memory Visibility, Reordering & The Happens-Before Guarantee",
+          "bodyMarkdown": "Under the Java Memory Model (JMM), threads may cache variables in CPU registers or store buffers. Compilers and CPUs are free to reorder instructions as long as single-threaded as-if-serial semantics are preserved.\n\nThe `volatile` keyword establishes a crucial **happens-before** edge:\n- A write to a `volatile` variable happens-before every subsequent read of that same variable.\n- It flushes store buffers to main memory and invalidates stale cache lines.\n- It prevents instruction reordering across the volatile access barrier.\n\n```java\npublic class FlagHolder {\n    private volatile boolean ready;\n    private int data;\n    public void writer() {\n        data = 42;\n        ready = true;\n    }\n    public int reader() {\n        return ready ? data : -1;\n    }\n}\n```\n\nImportant: `volatile` does **not** provide mutual exclusion or compound atomicity (such as `count++`).",
+          "diagramKey": "jmm_happens_before_barrier",
+          "quizQuestionIds": [
+            "q_jmm_volatile_visibility",
+            "q_jmm_dcl_bug",
+            "q_jmm_volatile_blank"
+          ]
+        },
+        {
+          "id": "note_virtual_threads",
+          "title": "Virtual Threads & Structured Concurrency",
+          "bodyMarkdown": "Introduced in Java 21 (Project Loom), **Virtual Threads** are lightweight user-mode threads managed by the JVM rather than the underlying OS kernel.\n\nKey differences from platform threads:\n- **Low memory footprint**: Virtual threads begin with a stack of only a few hundred bytes on the heap, allowing millions of concurrent tasks.\n- **M:N Scheduling**: The JVM mounts virtual threads onto a small pool of carrier platform threads (typically matching CPU core count via `ForkJoinPool`).\n- **Non-blocking I/O**: When a virtual thread performs blocking I/O (e.g., socket read, JDBC query, `Thread.sleep`), the JVM unmounts it from the carrier thread so the carrier can execute other virtual threads.\n\n```java\ntry (var executor = Executors.newVirtualThreadPerTaskExecutor()) {\n    IntStream.range(0, 10_000).forEach(i -> {\n        executor.submit(() -> {\n            Thread.sleep(Duration.ofMillis(100));\n            return i;\n        });\n    });\n}\n```\n\nCaution: Avoid holding `synchronized` blocks or native methods during blocking calls, as this **pins** the virtual thread to its carrier thread. Prefer `ReentrantLock` instead.",
+          "diagramKey": "loom_carrier_unmount",
+          "quizQuestionIds": [
+            "q_loom_thread_ordering",
+            "q_loom_pinning_choice",
+            "q_loom_concurrency_matching"
+          ]
+        }
+      ],
+      "questions": [
+        {
+          "type": "SingleChoice",
+          "id": "q_jmm_volatile_visibility",
+          "unitId": "unit_java_concurrency",
+          "difficulty": "MEDIUM",
+          "tags": ["jmm", "volatile", "concurrency"],
+          "docsUrl": "https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4",
+          "prompt": "Which architectural guarantee is provided by declaring a field volatile in Java?",
+          "code": "private volatile int state = 0;",
+          "options": [
+            "Atomic read-modify-write operations such as incrementing (state++)",
+            "Visibility of writes to all threads and memory ordering via happens-before relationships",
+            "Mutual exclusion locking identical to a synchronized method",
+            "Pinning the thread execution to a single hardware core"
+          ],
+          "correctIndex": 1,
+          "explanation": "Volatile guarantees memory visibility and establishes a happens-before relationship that prevents compiler and CPU memory reordering. However, it does NOT guarantee atomicity for compound operations like state++."
+        },
+        {
+          "type": "MultiSelect",
+          "id": "q_sync_guarantees_multi",
+          "unitId": "unit_java_concurrency",
+          "difficulty": "MEDIUM",
+          "tags": ["concurrency", "synchronized", "monitors"],
+          "docsUrl": "https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.1",
+          "prompt": "Which guarantees does entering and exiting an intrinsic synchronized block provide in standard Java?",
+          "options": [
+            "Mutual exclusion ensuring only one thread executes the protected block at a time",
+            "Visibility of all variable modifications made prior to releasing the lock",
+            "Asynchronous non-blocking execution using carrier threads",
+            "Happens-before order between lock release and subsequent lock acquisition"
+          ],
+          "correctIndices": [0, 1, 3],
+          "explanation": "An intrinsic synchronized block provides mutual exclusion, visibility (flushing writes upon exit and invalidating stale caches upon entry), and a happens-before relationship between the monitor release and any subsequent acquisition."
+        },
+        {
+          "type": "Ordering",
+          "id": "q_loom_thread_ordering",
+          "unitId": "unit_java_concurrency",
+          "difficulty": "MEDIUM",
+          "tags": ["loom", "virtual-threads", "concurrency"],
+          "docsUrl": "https://openjdk.org/jeps/444",
+          "prompt": "Order the sequence of actions when a virtual thread performs a blocking socket read:",
+          "items": [
+            "Virtual thread initiates read() on a network socket channel",
+            "JVM intercepts blocking operation and unmounts virtual thread from carrier thread",
+            "OS kernel performs network I/O while carrier thread runs other runnable tasks",
+            "Kernel signals I/O completion and JVM remounts virtual thread onto an available carrier"
+          ],
+          "explanation": "When a virtual thread blocks on non-pinned I/O, the JVM unmounts its execution context from the carrier thread, lets the carrier run other tasks, and remounts the virtual thread upon I/O readiness."
+        },
+        {
+          "type": "Matching",
+          "id": "q_loom_concurrency_matching",
+          "unitId": "unit_java_concurrency",
+          "difficulty": "HARD",
+          "tags": ["concurrency", "synchronizers"],
+          "docsUrl": "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/package-summary.html",
+          "prompt": "Match each java.util.concurrent utility to its synchronization characteristic:",
+          "pairs": [
+            {
+              "left": "CountDownLatch",
+              "right": "One-shot countdown barrier that cannot be reset"
+            },
+            {
+              "left": "CyclicBarrier",
+              "right": "Reusable synchronization point that trips when all parties arrive"
+            },
+            {
+              "left": "Semaphore",
+              "right": "Maintains a fixed set of permits for rate limiting or throttling"
+            },
+            {
+              "left": "Phaser",
+              "right": "Flexible barrier supporting dynamic number of parties across multi-phase tasks"
+            }
+          ],
+          "explanation": "CountDownLatch is non-reusable and decrements to zero; CyclicBarrier resets automatically after tripping; Semaphore manages permit counters; Phaser provides phased synchronization with dynamic party counts."
+        },
+        {
+          "type": "PredictOutput",
+          "id": "q_java_pred_intern",
+          "unitId": "unit_java_concurrency",
+          "difficulty": "EASY",
+          "tags": ["strings", "jvm-internals"],
+          "prompt": "What does this code snippet print to standard output?",
+          "code": "String s1 = new String(\"interview\");\nString s2 = s1.intern();\nString s3 = \"interview\";\nSystem.out.println((s1 == s2) + \" \" + (s2 == s3));",
+          "options": [
+            "false true",
+            "true true",
+            "false false",
+            "true false"
+          ],
+          "correctIndex": 0,
+          "explanation": "s1 refers to a distinct object instance on the heap, while intern() returns the canonical instance from the JVM string constant pool. s3 directly references that same constant pool entry. Thus s1 == s2 is false, but s2 == s3 is true."
+        },
+        {
+          "type": "SpotTheBug",
+          "id": "q_jmm_dcl_bug",
+          "unitId": "unit_java_concurrency",
+          "difficulty": "HARD",
+          "tags": ["jmm", "patterns", "singleton"],
+          "prompt": "Identify the line with the thread-safety vulnerability in double-checked locking:",
+          "codeLines": [
+            "public class LazyRegistry {",
+            "    private static LazyRegistry instance;",
+            "    public static LazyRegistry getInstance() {",
+            "        if (instance == null) {",
+            "            synchronized (LazyRegistry.class) {",
+            "                if (instance == null) {",
+            "                    instance = new LazyRegistry();",
+            "                }",
+            "            }",
+            "        }",
+            "        return instance;",
+            "    }",
+            "}"
+          ],
+          "buggyLineIndices": [1],
+          "explanation": "Without the volatile modifier on the instance field, instruction reordering during instance construction (allocating memory, assigning reference, executing constructor) can allow another thread to observe a non-null, partially-initialized object."
+        },
+        {
+          "type": "FillBlank",
+          "id": "q_jmm_volatile_blank",
+          "unitId": "unit_java_concurrency",
+          "difficulty": "EASY",
+          "tags": ["jmm", "keywords"],
+          "prompt": "In Java, to prevent a thread from using stale cached values of a field without using synchronized, you must declare the field with the ___ keyword.",
+          "acceptedAnswers": [
+            "volatile"
+          ],
+          "explanation": "The volatile keyword ensures direct reads and writes to main memory, preventing thread-local caching in CPU registers or L1/L2 caches."
+        },
+        {
+          "type": "ShortAnswer",
+          "id": "q_concurrency_cas_sa",
+          "unitId": "unit_java_concurrency",
+          "difficulty": "HARD",
+          "tags": ["concurrency", "lock-free", "cas"],
+          "prompt": "Explain the mechanism and trade-offs of Compare-And-Swap (CAS) in atomic classes like AtomicInteger.",
+          "modelAnswer": "Compare-And-Swap (CAS) is an atomic CPU instruction (e.g. cmpxchg) that updates memory only if its current value matches an expected value. It enables optimistic, lock-free concurrency avoiding thread context switching overhead, but can suffer from busy-wait CPU spinning under high write contention and the ABA problem if not counter-stamped.",
+          "keyPoints": [
+            "Atomic CPU instruction comparing expected vs current value before updating",
+            "Lock-free and avoids thread suspension or context switch overhead",
+            "Spinning under high contention can consume excessive CPU",
+            "Vulnerable to the ABA problem unless versioned (e.g. AtomicStampedReference)"
+          ],
+          "explanation": "CAS provides non-blocking thread safety via hardware-supported atomic primitives, trading thread sleep/wake overhead for potential CPU spin cycles under high contention."
+        },
+        {
+          "type": "SingleChoice",
+          "id": "q_loom_pinning_choice",
+          "unitId": "unit_java_concurrency",
+          "difficulty": "HARD",
+          "tags": ["loom", "virtual-threads", "pinning"],
+          "docsUrl": "https://openjdk.org/jeps/444",
+          "prompt": "Which condition in Java 21 causes a virtual thread to become 'pinned' to its carrier platform thread during blocking operations?",
+          "code": "synchronized (lock) {\n    socketChannel.read(buffer);\n}",
+          "options": [
+            "Executing a blocking call inside a synchronized block or method, or calling native code (JNI)",
+            "Allocating objects on the heap exceeding 64 kilobytes",
+            "Using ReentrantLock.lock() prior to the blocking call",
+            "Running the application with more than 8 available CPU cores"
+          ],
+          "correctIndex": 0,
+          "explanation": "In Java 21, executing blocking I/O while inside a synchronized monitor or foreign/native JNI call pins the virtual thread to its underlying OS carrier thread, preventing the carrier from servicing other virtual threads. Using ReentrantLock avoids this limitation."
+        }
+      ]
+    }
+  ]
+}

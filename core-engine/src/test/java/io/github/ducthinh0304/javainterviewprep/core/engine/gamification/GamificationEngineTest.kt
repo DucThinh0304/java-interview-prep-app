@@ -3,7 +3,6 @@ package io.github.ducthinh0304.javainterviewprep.core.engine.gamification
 import io.github.ducthinh0304.javainterviewprep.core.model.Difficulty
 import io.github.ducthinh0304.javainterviewprep.core.model.UserStats
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GamificationEngineTest {
@@ -12,9 +11,9 @@ class GamificationEngineTest {
 
     @Test
     fun baseXp_scalesWithDifficulty() {
-        assertEquals(10, engine.calculateBaseXp(Difficulty.JUNIOR))
-        assertEquals(20, engine.calculateBaseXp(Difficulty.MID))
-        assertEquals(35, engine.calculateBaseXp(Difficulty.SENIOR))
+        assertEquals(10, engine.calculateBaseXp(Difficulty.EASY))
+        assertEquals(20, engine.calculateBaseXp(Difficulty.MEDIUM))
+        assertEquals(35, engine.calculateBaseXp(Difficulty.HARD))
     }
 
     @Test
@@ -71,7 +70,7 @@ class GamificationEngineTest {
         val initial = UserStats(xp = 0, consecutiveCorrectAnswers = 0, comboMultiplier = 1.0)
         val (updated, earnedXp) = engine.applyAnswerResult(
             currentStats = initial,
-            difficulty = Difficulty.MID,
+            difficulty = Difficulty.MEDIUM,
             isCorrect = true,
             todayEpochDay = 20000L
         )

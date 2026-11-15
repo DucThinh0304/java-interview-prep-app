@@ -18,3 +18,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
+
+dependencies {
+    implementation(project(":core-model"))
+    implementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.junit)
+}

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,7 +22,7 @@ import io.github.ducthinh0304.javainterviewprep.core.engine.theme.AppTheme
 import io.github.ducthinh0304.javainterviewprep.core.engine.theme.components.DevBadge
 import io.github.ducthinh0304.javainterviewprep.core.engine.theme.components.DevCard
 import io.github.ducthinh0304.javainterviewprep.core.engine.theme.components.DevCodeBlock
-import io.github.ducthinh0304.javainterviewprep.core.model.Exercise
+import io.github.ducthinh0304.javainterviewprep.core.model.Question
 
 @Composable
 fun HomeScreen(
@@ -159,7 +158,7 @@ private fun HeaderSection(state: HomeUiState) {
 @Composable
 private fun DailyQuestionSection(
     state: HomeUiState,
-    onOptionSelected: (String) -> Unit
+    onOptionSelected: (Int) -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -181,85 +180,29 @@ private fun DailyQuestionSection(
         }
 
         when (val question = state.dailyQuestion) {
-            is Exercise.MultipleChoice -> {
-                DevCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.sm)) {
-                        Text(
-                            text = question.prompt,
-                            style = AppTheme.typography.body,
-                            color = AppTheme.colors.textPrimary
-                        )
-
-                        question.codeSnippet?.let { snippet ->
-                            DevCodeBlock(
-                                code = snippet,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(AppTheme.spacing.xs))
-
-                        // Options
-                        question.options.forEach { option ->
-                            val isSelected = state.selectedOptionId == option.id
-                            val isEvaluated = state.evaluationResult != null
-
-                            val borderColor = when {
-                                !isEvaluated && isSelected -> AppTheme.colors.borderFocus
-                                isEvaluated && option.isCorrect -> AppTheme.colors.accent
-                                isEvaluated && isSelected && !option.isCorrect -> AppTheme.colors.error
-                                else -> AppTheme.colors.borderHairline
-                            }
-
-                            val bgColor = when {
-                                isEvaluated && option.isCorrect -> AppTheme.colors.surfaceElevated
-                                isEvaluated && isSelected && !option.isCorrect -> AppTheme.colors.surfaceElevated
-                                else -> AppTheme.colors.surface
-                            }
-
-                            DevCard(
-                                modifier = Modifier.fillMaxWidth(),
-                                backgroundColor = bgColor,
-                                borderColor = borderColor,
-                                onClick = if (!isEvaluated) { { onOptionSelected(option.id) } } else null
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = option.text,
-                                        style = AppTheme.typography.bodySmall,
-                                        color = AppTheme.colors.textPrimary
-                                    )
-                                }
-                            }
-                        }
-
-                        // Explanation after answer
-                        state.evaluationResult?.let { result ->
-                            Spacer(modifier = Modifier.height(AppTheme.spacing.xs))
-                            DevCard(
-                                modifier = Modifier.fillMaxWidth(),
-                                backgroundColor = AppTheme.colors.surfaceElevated,
-                                borderColor = if (result.isCorrect) AppTheme.colors.accent else AppTheme.colors.warning
-                            ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.xs)) {
-                                    Text(
-                                        text = if (result.isCorrect) "CORRECT (+${state.lastEarnedXp ?: 0} XP)" else "INCORRECT (Sent to Re-run)",
-                                        style = AppTheme.typography.badge,
-                                        color = if (result.isCorrect) AppTheme.colors.accent else AppTheme.colors.warning
-                                    )
-                                    Text(
-                                        text = result.explanation,
-                                        style = AppTheme.typography.bodySmall,
-                                        color = AppTheme.colors.textSecondary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+            is Question.SingleChoice -> {
+                QuestionCard(
+                    prompt = question.prompt,
+                    codeSnippet = question.code,
+                    options = question.options,
+                    correctIndex = question.correctIndex,
+                    selectedIndex = state.selectedOptionIndex,
+                    evaluationResult = state.evaluationResult,
+                    lastEarnedXp = state.lastEarnedXp,
+                    onOptionSelected = onOptionSelected
+                )
+            }
+            is Question.PredictOutput -> {
+                QuestionCard(
+                    prompt = question.prompt,
+                    codeSnippet = question.code,
+                    options = question.options,
+                    correctIndex = question.correctIndex,
+                    selectedIndex = state.selectedOptionIndex,
+                    evaluationResult = state.evaluationResult,
+                    lastEarnedXp = state.lastEarnedXp,
+                    onOptionSelected = onOptionSelected
+                )
             }
             null -> {
                 DevCard(modifier = Modifier.fillMaxWidth()) {
@@ -270,7 +213,106 @@ private fun DailyQuestionSection(
                     )
                 }
             }
-            else -> Unit
+            else -> {
+                DevCard(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = question.prompt,
+                        style = AppTheme.typography.body,
+                        color = AppTheme.colors.textPrimary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuestionCard(
+    prompt: String,
+    codeSnippet: String?,
+    options: List<String>,
+    correctIndex: Int,
+    selectedIndex: Int?,
+    evaluationResult: io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.EvaluationResult?,
+    lastEarnedXp: Int?,
+    onOptionSelected: (Int) -> Unit
+) {
+    DevCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.sm)) {
+            Text(
+                text = prompt,
+                style = AppTheme.typography.body,
+                color = AppTheme.colors.textPrimary
+            )
+
+            codeSnippet?.let { snippet ->
+                DevCodeBlock(
+                    code = snippet,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(modifier = Modifier.height(AppTheme.spacing.xs))
+
+            options.forEachIndexed { index, optionText ->
+                val isSelected = selectedIndex == index
+                val isEvaluated = evaluationResult != null
+                val isCorrect = index == correctIndex
+
+                val borderColor = when {
+                    !isEvaluated && isSelected -> AppTheme.colors.borderFocus
+                    isEvaluated && isCorrect -> AppTheme.colors.accent
+                    isEvaluated && isSelected && !isCorrect -> AppTheme.colors.error
+                    else -> AppTheme.colors.borderHairline
+                }
+
+                val bgColor = when {
+                    isEvaluated && isCorrect -> AppTheme.colors.surfaceElevated
+                    isEvaluated && isSelected && !isCorrect -> AppTheme.colors.surfaceElevated
+                    else -> AppTheme.colors.surface
+                }
+
+                DevCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    backgroundColor = bgColor,
+                    borderColor = borderColor,
+                    onClick = if (!isEvaluated) { { onOptionSelected(index) } } else null
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = optionText,
+                            style = AppTheme.typography.bodySmall,
+                            color = AppTheme.colors.textPrimary
+                        )
+                    }
+                }
+            }
+
+            // Explanation after answer
+            evaluationResult?.let { result ->
+                Spacer(modifier = Modifier.height(AppTheme.spacing.xs))
+                DevCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    backgroundColor = AppTheme.colors.surfaceElevated,
+                    borderColor = if (result.isCorrect) AppTheme.colors.accent else AppTheme.colors.warning
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.xs)) {
+                        Text(
+                            text = if (result.isCorrect) "CORRECT (+${lastEarnedXp ?: 0} XP)" else "INCORRECT (Sent to Re-run)",
+                            style = AppTheme.typography.badge,
+                            color = if (result.isCorrect) AppTheme.colors.accent else AppTheme.colors.warning
+                        )
+                        Text(
+                            text = result.explanation,
+                            style = AppTheme.typography.bodySmall,
+                            color = AppTheme.colors.textSecondary
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -287,7 +329,7 @@ private fun MiniLessonsSection(state: HomeUiState) {
             color = AppTheme.colors.textSecondary
         )
 
-        state.lessons.forEach { lesson ->
+        state.notes.forEach { note ->
             DevCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.xs)) {
                     Row(
@@ -296,14 +338,14 @@ private fun MiniLessonsSection(state: HomeUiState) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = lesson.title,
+                            text = note.title,
                             style = AppTheme.typography.title,
                             color = AppTheme.colors.textPrimary
                         )
-                        DevBadge(text = "${lesson.durationMinutes}m")
+                        DevBadge(text = "${note.quizQuestionIds.size} quiz items")
                     }
                     Text(
-                        text = lesson.contentMarkdown,
+                        text = note.bodyMarkdown,
                         style = AppTheme.typography.bodySmall,
                         color = AppTheme.colors.textSecondary
                     )

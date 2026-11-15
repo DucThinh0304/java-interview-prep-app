@@ -7,8 +7,8 @@ import io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.AnswerEva
 import io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.EvaluationResult
 import io.github.ducthinh0304.javainterviewprep.core.engine.repository.ContentRepository
 import io.github.ducthinh0304.javainterviewprep.core.engine.repository.UserProgressRepository
-import io.github.ducthinh0304.javainterviewprep.core.model.Exercise
-import io.github.ducthinh0304.javainterviewprep.core.model.Lesson
+import io.github.ducthinh0304.javainterviewprep.core.model.Note
+import io.github.ducthinh0304.javainterviewprep.core.model.Question
 import io.github.ducthinh0304.javainterviewprep.core.model.UserStats
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,10 +21,10 @@ import javax.inject.Inject
 data class HomeUiState(
     val isLoading: Boolean = true,
     val stats: UserStats = UserStats(),
-    val dailyQuestion: Exercise? = null,
-    val lessons: List<Lesson> = emptyList(),
+    val dailyQuestion: Question? = null,
+    val notes: List<Note> = emptyList(),
     val reviewQueueCount: Int = 0,
-    val selectedOptionId: String? = null,
+    val selectedOptionIndex: Int? = null,
     val evaluationResult: EvaluationResult? = null,
     val lastEarnedXp: Int? = null
 )
@@ -53,7 +53,7 @@ class HomeViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 dailyQuestion = daily,
-                lessons = pack.lessons
+                notes = pack.allNotes()
             )
         }
     }
@@ -74,23 +74,28 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun selectOption(optionId: String) {
-        val currentDaily = _uiState.value.dailyQuestion as? Exercise.MultipleChoice ?: return
+    fun selectOption(optionIndex: Int) {
+        val daily = _uiState.value.dailyQuestion ?: return
         if (_uiState.value.evaluationResult != null) return // Already submitted
 
-        val result = answerEvaluator.evaluateMultipleChoice(currentDaily, optionId)
+        val result = when (daily) {
+            is Question.SingleChoice -> answerEvaluator.evaluateSingleChoice(daily, optionIndex)
+            is Question.PredictOutput -> answerEvaluator.evaluatePredictOutput(daily, optionIndex)
+            else -> return
+        }
+
         val todayEpochDay = LocalDate.now().toEpochDay()
 
         viewModelScope.launch {
             val (_, earnedXp) = userProgressRepository.recordAttempt(
-                exerciseId = currentDaily.id,
-                difficulty = currentDaily.difficulty,
+                exerciseId = daily.id,
+                difficulty = daily.difficulty,
                 isCorrect = result.isCorrect,
                 todayEpochDay = todayEpochDay
             )
 
             _uiState.value = _uiState.value.copy(
-                selectedOptionId = optionId,
+                selectedOptionIndex = optionIndex,
                 evaluationResult = result,
                 lastEarnedXp = earnedXp
             )
