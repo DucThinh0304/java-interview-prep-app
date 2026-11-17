@@ -75,14 +75,26 @@ class SubmitDailyAnswerTest {
 
         val xp = submit(question, selectedOptionIndex = 0, isCorrect = true)
 
-        assertEquals(10, xp)
+        assertEquals(30, xp) // 10 base + 10 daily bonus + 10 day-1 check-in
         assertEquals(1, database.questionStatDao().get("q1")?.timesSeen)
-        assertEquals(10, database.userStatsDao().get()?.totalXp)
+        assertEquals(30, database.userStatsDao().get()?.totalXp)
+        assertEquals(30, database.dailyActivityDao().get(today)?.xpEarned)
         val daily = database.dailyAnswerDao().get(today)
         assertEquals(0, daily?.selectedOptionIndex)
-        assertEquals(10, daily?.xpEarned)
+        assertEquals(30, daily?.xpEarned)
         assertEquals(1, database.dailyActivityDao().get(today)?.quizzesCompleted)
         assertEquals(1, database.userStatsDao().get()?.currentStreak)
+    }
+
+    @Test
+    fun submit_wrongAnswerStillPaysTheCheckIn() = runTest {
+        val submit = SubmitDailyAnswer(database, progressRepository, statsRepository, clock)
+
+        val xp = submit(question, selectedOptionIndex = 1, isCorrect = false)
+
+        assertEquals(10, xp)
+        assertEquals(10, database.userStatsDao().get()?.totalXp)
+        assertEquals(10, database.dailyAnswerDao().get(today)?.xpEarned)
     }
 
     @Test

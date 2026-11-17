@@ -5,36 +5,9 @@ import io.github.ducthinh0304.javainterviewprep.core.model.UserStats
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.roundToInt
 
 @Singleton
 class GamificationEngine @Inject constructor() {
-
-    fun calculateBaseXp(difficulty: Difficulty): Int {
-        return when (difficulty) {
-            Difficulty.EASY -> 10
-            Difficulty.MEDIUM -> 20
-            Difficulty.HARD -> 35
-        }
-    }
-
-    fun calculateEarnedXp(difficulty: Difficulty, comboMultiplier: Double): Int {
-        val base = calculateBaseXp(difficulty)
-        return (base * comboMultiplier).roundToInt()
-    }
-
-    fun calculateNextCombo(currentConsecutive: Int, isCorrect: Boolean): Pair<Int, Double> {
-        return if (isCorrect) {
-            val nextConsecutive = currentConsecutive + 1
-            // Combo multiplier scales by +0.1 for every consecutive correct, capped at 2.5x
-            val multiplier = min(2.5, 1.0 + (nextConsecutive * 0.1))
-            val roundedMultiplier = (multiplier * 10).roundToInt() / 10.0
-            Pair(nextConsecutive, roundedMultiplier)
-        } else {
-            Pair(0, 1.0)
-        }
-    }
 
     fun calculateStreak(
         currentStreak: Int,
@@ -57,26 +30,20 @@ class GamificationEngine @Inject constructor() {
         }
     }
 
+    /** The answer that reaches a combo tier already earns at that tier's multiplier. */
     fun applyAnswerResult(
         currentStats: UserStats,
         difficulty: Difficulty,
-        isCorrect: Boolean
+        isCorrect: Boolean,
+        isDaily: Boolean = false
     ): Pair<UserStats, Int> {
-        val (newConsecutive, newCombo) = calculateNextCombo(
-            currentConsecutive = currentStats.consecutiveCorrectAnswers,
-            isCorrect = isCorrect
-        )
-
-        val earnedXp = if (isCorrect) {
-            calculateEarnedXp(difficulty, currentStats.comboMultiplier)
-        } else {
-            0
-        }
+        val combo = ComboTracker(currentStats.consecutiveCorrectAnswers).next(isCorrect)
+        val earnedXp = XpCalculator.earned(difficulty, isCorrect, combo.multiplier, isDaily)
 
         val updatedStats = currentStats.copy(
             xp = currentStats.xp + earnedXp,
-            comboMultiplier = newCombo,
-            consecutiveCorrectAnswers = newConsecutive,
+            comboMultiplier = combo.multiplier,
+            consecutiveCorrectAnswers = combo.streak,
             totalExercisesAnswered = currentStats.totalExercisesAnswered + 1,
             totalCorrectAnswers = currentStats.totalCorrectAnswers + if (isCorrect) 1 else 0
         )

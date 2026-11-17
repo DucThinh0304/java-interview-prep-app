@@ -10,29 +10,6 @@ class GamificationEngineTest {
     private val engine = GamificationEngine()
 
     @Test
-    fun baseXp_scalesWithDifficulty() {
-        assertEquals(10, engine.calculateBaseXp(Difficulty.EASY))
-        assertEquals(20, engine.calculateBaseXp(Difficulty.MEDIUM))
-        assertEquals(35, engine.calculateBaseXp(Difficulty.HARD))
-    }
-
-    @Test
-    fun combo_increasesOnConsecutiveCorrectAnswers() {
-        val (c1, m1) = engine.calculateNextCombo(currentConsecutive = 0, isCorrect = true)
-        assertEquals(1, c1)
-        assertEquals(1.1, m1, 0.001)
-
-        val (c2, m2) = engine.calculateNextCombo(currentConsecutive = 1, isCorrect = true)
-        assertEquals(2, c2)
-        assertEquals(1.2, m2, 0.001)
-
-        // Resets on incorrect answer
-        val (cReset, mReset) = engine.calculateNextCombo(currentConsecutive = 5, isCorrect = false)
-        assertEquals(0, cReset)
-        assertEquals(1.0, mReset, 0.001)
-    }
-
-    @Test
     fun streak_incrementsOnConsecutiveDays() {
         val today = 20000L
         val yesterday = 19999L
@@ -66,19 +43,27 @@ class GamificationEngineTest {
     }
 
     @Test
-    fun applyAnswerResult_awardsCorrectXpAndUpdatesStats() {
-        val initial = UserStats(xp = 0, consecutiveCorrectAnswers = 0, comboMultiplier = 1.0)
-        val (updated, earnedXp) = engine.applyAnswerResult(
-            currentStats = initial,
-            difficulty = Difficulty.MEDIUM,
-            isCorrect = true
-        )
+    fun applyAnswerResult_awardsXpAndAdvancesCombo() {
+        val initial = UserStats(xp = 0, consecutiveCorrectAnswers = 2)
+        val (updated, earnedXp) = engine.applyAnswerResult(initial, Difficulty.MEDIUM, isCorrect = true)
 
-        assertEquals(20, earnedXp)
-        assertEquals(20, updated.xp)
-        assertEquals(1, updated.consecutiveCorrectAnswers)
-        assertEquals(1.1, updated.comboMultiplier, 0.001)
+        assertEquals(30, earnedXp) // 3rd in a row reaches x1.5
+        assertEquals(30, updated.xp)
+        assertEquals(3, updated.consecutiveCorrectAnswers)
+        assertEquals(1.5, updated.comboMultiplier, 0.001)
         assertEquals(1, updated.totalExercisesAnswered)
         assertEquals(1, updated.totalCorrectAnswers)
+    }
+
+    @Test
+    fun applyAnswerResult_wrongAnswerResetsComboAndEarnsNothing() {
+        val initial = UserStats(xp = 50, consecutiveCorrectAnswers = 7, comboMultiplier = 2.0)
+        val (updated, earnedXp) = engine.applyAnswerResult(initial, Difficulty.HARD, isCorrect = false, isDaily = true)
+
+        assertEquals(0, earnedXp)
+        assertEquals(50, updated.xp)
+        assertEquals(0, updated.consecutiveCorrectAnswers)
+        assertEquals(1.0, updated.comboMultiplier, 0.001)
+        assertEquals(0, updated.totalCorrectAnswers)
     }
 }

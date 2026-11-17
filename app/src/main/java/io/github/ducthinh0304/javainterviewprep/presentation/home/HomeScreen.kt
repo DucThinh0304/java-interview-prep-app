@@ -83,7 +83,7 @@ private fun HeaderSection(state: HomeUiState) {
                 color = AppTheme.colors.textPrimary
             )
             DevBadge(
-                text = "[${state.stats.level.badgeLabel}]",
+                text = "[${state.level.badgeLabel}]",
                 backgroundColor = AppTheme.colors.surfaceElevated,
                 textColor = AppTheme.colors.accent,
                 borderColor = AppTheme.colors.accent
@@ -233,7 +233,7 @@ private fun QuestionCard(
     options: List<String>,
     correctIndex: Int,
     selectedIndex: Int?,
-    evaluationResult: io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.EvaluationResult?,
+    evaluationResult: io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.CheckResult?,
     lastEarnedXp: Int?,
     onOptionSelected: (Int) -> Unit
 ) {
@@ -301,7 +301,11 @@ private fun QuestionCard(
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.xs)) {
                         Text(
-                            text = if (result.isCorrect) "CORRECT (+${lastEarnedXp ?: 0} XP)" else "INCORRECT (Sent to Re-run)",
+                            text = when {
+                                result.isCorrect -> "CORRECT (+${lastEarnedXp ?: 0} XP)"
+                                (lastEarnedXp ?: 0) > 0 -> "INCORRECT (+$lastEarnedXp XP check-in, sent to Re-run)"
+                                else -> "INCORRECT (Sent to Re-run)"
+                            },
                             style = AppTheme.typography.badge,
                             color = if (result.isCorrect) AppTheme.colors.accent else AppTheme.colors.warning
                         )
