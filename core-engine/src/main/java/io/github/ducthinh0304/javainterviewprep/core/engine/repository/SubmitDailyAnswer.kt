@@ -11,7 +11,7 @@ import javax.inject.Inject
  * Records a daily answer atomically: question stat, XP/activity, the daily_answer row and the
  * quiz completion (the daily is a one-question quiz, so it checks the day in). All of them
  * land or none do (e.g. if the ViewModel scope is cancelled mid-save).
- * Returns the XP earned.
+ * Returns the XP earned: the answer's XP plus the check-in bonus (paid even when wrong).
  */
 class SubmitDailyAnswer @Inject constructor(
     private val database: EngineDatabase,
@@ -24,11 +24,11 @@ class SubmitDailyAnswer @Inject constructor(
     suspend operator fun invoke(question: Question, selectedOptionIndex: Int, isCorrect: Boolean): Int =
         database.withTransaction {
             progressRepository.recordQuestionAttempt(question.id, isCorrect)
-            val (_, earnedXp) = statsRepository.recordAnswer(question.difficulty, isCorrect)
+            val (_, answerXp) = statsRepository.recordAnswer(question.difficulty, isCorrect, isDaily = true)
+            val earnedXp = answerXp + statsRepository.recordQuizCompleted()
             progressRepository.recordDailyAnswer(
                 LocalDate.now(clock), question.id, selectedOptionIndex, isCorrect, earnedXp
             )
-            statsRepository.recordQuizCompleted()
             earnedXp
         }
 }

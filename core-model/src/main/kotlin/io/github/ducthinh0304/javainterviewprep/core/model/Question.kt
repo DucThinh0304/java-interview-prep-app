@@ -119,12 +119,7 @@ sealed interface Question {
         override val explanation: String,
         override val prompt: String,
         val acceptedAnswers: List<String>
-    ) : Question {
-        fun isAnswerAccepted(input: String): Boolean {
-            val normalizedInput = input.trim()
-            return acceptedAnswers.any { it.trim().equals(normalizedInput, ignoreCase = true) }
-        }
-    }
+    ) : Question
 
     @Serializable
     @SerialName("ShortAnswer")

@@ -169,10 +169,7 @@ class PackSchemaTest {
         assertTrue(decodedUnit.questions[6] is Question.FillBlank)
         assertTrue(decodedUnit.questions[7] is Question.ShortAnswer)
 
-        // Verify FillBlank answer evaluation
         val fb = decodedUnit.questions[6] as Question.FillBlank
-        assertTrue(fb.isAnswerAccepted("volatile"))
-        assertTrue(fb.isAnswerAccepted(" VOLATILE "))
-        assertTrue(!fb.isAnswerAccepted("synchronized"))
+        assertEquals(listOf("volatile"), fb.acceptedAnswers)
     }
 }

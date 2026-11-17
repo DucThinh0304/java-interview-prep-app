@@ -3,12 +3,15 @@ package io.github.ducthinh0304.javainterviewprep.presentation.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.AnswerEvaluator
-import io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.EvaluationResult
+import io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.AnswerChecker
+import io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.CheckResult
+import io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.UserAnswer
+import io.github.ducthinh0304.javainterviewprep.core.engine.gamification.LevelLadder
 import io.github.ducthinh0304.javainterviewprep.core.engine.repository.ContentRepository
 import io.github.ducthinh0304.javainterviewprep.core.engine.repository.ProgressRepository
 import io.github.ducthinh0304.javainterviewprep.core.engine.repository.StatsRepository
 import io.github.ducthinh0304.javainterviewprep.core.engine.repository.SubmitDailyAnswer
+import io.github.ducthinh0304.javainterviewprep.core.model.DevLevel
 import io.github.ducthinh0304.javainterviewprep.core.model.Note
 import io.github.ducthinh0304.javainterviewprep.core.model.Question
 import io.github.ducthinh0304.javainterviewprep.core.model.UserStats
@@ -26,11 +29,12 @@ import javax.inject.Inject
 data class HomeUiState(
     val isLoading: Boolean = true,
     val stats: UserStats = UserStats(),
+    val level: DevLevel = DevLevel.SNAPSHOT,
     val dailyQuestion: Question? = null,
     val notes: List<Note> = emptyList(),
     val reviewQueueCount: Int = 0,
     val selectedOptionIndex: Int? = null,
-    val evaluationResult: EvaluationResult? = null,
+    val evaluationResult: CheckResult? = null,
     val lastEarnedXp: Int? = null
 )
 
@@ -39,7 +43,7 @@ class HomeViewModel @Inject constructor(
     private val contentRepository: ContentRepository,
     private val progressRepository: ProgressRepository,
     private val statsRepository: StatsRepository,
-    private val answerEvaluator: AnswerEvaluator,
+    private val levelLadder: LevelLadder,
     private val submitDailyAnswer: SubmitDailyAnswer,
     private val clock: Clock
 ) : ViewModel() {
@@ -82,6 +86,7 @@ class HomeViewModel @Inject constructor(
             }.collect { (stats, queueCount) ->
                 _uiState.value = _uiState.value.copy(
                     stats = stats,
+                    level = levelLadder.levelFor(stats.xp),
                     reviewQueueCount = queueCount
                 )
             }
@@ -105,9 +110,8 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun evaluate(question: Question, optionIndex: Int): EvaluationResult? = when (question) {
-        is Question.SingleChoice -> answerEvaluator.evaluateSingleChoice(question, optionIndex)
-        is Question.PredictOutput -> answerEvaluator.evaluatePredictOutput(question, optionIndex)
+    private fun evaluate(question: Question, optionIndex: Int): CheckResult? = when (question) {
+        is Question.SingleChoice, is Question.PredictOutput -> AnswerChecker.check(question, UserAnswer.Choice(optionIndex))
         else -> null
     }
 }

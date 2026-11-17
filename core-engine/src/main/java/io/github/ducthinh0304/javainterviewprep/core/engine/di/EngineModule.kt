@@ -13,6 +13,7 @@ import io.github.ducthinh0304.javainterviewprep.core.engine.db.EngineDatabase
 import io.github.ducthinh0304.javainterviewprep.core.engine.db.NoteProgressDao
 import io.github.ducthinh0304.javainterviewprep.core.engine.db.QuestionStatDao
 import io.github.ducthinh0304.javainterviewprep.core.engine.db.UserStatsDao
+import io.github.ducthinh0304.javainterviewprep.core.engine.gamification.LevelLadder
 import io.github.ducthinh0304.javainterviewprep.core.engine.theme.JavaThemePack
 import io.github.ducthinh0304.javainterviewprep.core.engine.theme.ThemePack
 import kotlinx.serialization.json.Json
@@ -75,4 +76,7 @@ object EngineModule {
     @Provides
     @Singleton
     fun provideDefaultThemePack(): ThemePack = JavaThemePack
+
+    @Provides
+    fun provideLevelLadder(): LevelLadder = LevelLadder.DEFAULT
 }

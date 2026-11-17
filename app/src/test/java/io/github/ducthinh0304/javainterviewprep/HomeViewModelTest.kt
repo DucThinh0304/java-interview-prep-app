@@ -1,12 +1,12 @@
 package io.github.ducthinh0304.javainterviewprep
 
-import io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.AnswerEvaluator
-import io.github.ducthinh0304.javainterviewprep.core.engine.evaluation.EvaluationResult
+import io.github.ducthinh0304.javainterviewprep.core.engine.gamification.LevelLadder
 import io.github.ducthinh0304.javainterviewprep.core.engine.db.DailyAnswerEntity
 import io.github.ducthinh0304.javainterviewprep.core.engine.repository.ContentRepository
 import io.github.ducthinh0304.javainterviewprep.core.engine.repository.ProgressRepository
 import io.github.ducthinh0304.javainterviewprep.core.engine.repository.StatsRepository
 import io.github.ducthinh0304.javainterviewprep.core.engine.repository.SubmitDailyAnswer
+import io.github.ducthinh0304.javainterviewprep.core.model.DevLevel
 import io.github.ducthinh0304.javainterviewprep.core.model.Difficulty
 import io.github.ducthinh0304.javainterviewprep.core.model.Pack
 import io.github.ducthinh0304.javainterviewprep.core.model.Question
@@ -42,13 +42,12 @@ class HomeViewModelTest {
     private val contentRepository = mockk<ContentRepository>()
     private val progressRepository = mockk<ProgressRepository>()
     private val statsRepository = mockk<StatsRepository>()
-    private val answerEvaluator = mockk<AnswerEvaluator>()
     private val submitDailyAnswer = mockk<SubmitDailyAnswer>()
     private val today = LocalDate.of(2026, 11, 15)
     private val clock = Clock.fixed(Instant.parse("2026-11-15T09:00:00Z"), ZoneOffset.UTC)
 
     private fun newViewModel() = HomeViewModel(
-        contentRepository, progressRepository, statsRepository, answerEvaluator, submitDailyAnswer, clock
+        contentRepository, progressRepository, statsRepository, LevelLadder.DEFAULT, submitDailyAnswer, clock
     )
 
     private val dummyQuestion = Question.SingleChoice(
@@ -101,6 +100,7 @@ class HomeViewModelTest {
         assertNotNull(loadedState.dailyQuestion)
         assertEquals("test_ex_1", loadedState.dailyQuestion?.id)
         assertEquals(40, loadedState.stats.xp)
+        assertEquals(DevLevel.SNAPSHOT, loadedState.level)
     }
 
     @Test
@@ -166,13 +166,5 @@ class HomeViewModelTest {
 
     private fun stubSubmission() {
         coEvery { submitDailyAnswer(any(), any(), any()) } returns 10
-
-        every {
-            answerEvaluator.evaluateSingleChoice(dummyQuestion, 0)
-        } returns EvaluationResult(
-            isCorrect = true,
-            selectedId = "0",
-            explanation = "Sample explanation"
-        )
     }
 }

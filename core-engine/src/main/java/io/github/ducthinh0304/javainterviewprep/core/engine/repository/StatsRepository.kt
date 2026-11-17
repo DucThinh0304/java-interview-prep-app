@@ -7,6 +7,7 @@ import io.github.ducthinh0304.javainterviewprep.core.engine.db.EngineDatabase
 import io.github.ducthinh0304.javainterviewprep.core.engine.db.UserStatsDao
 import io.github.ducthinh0304.javainterviewprep.core.engine.db.UserStatsEntity
 import io.github.ducthinh0304.javainterviewprep.core.engine.gamification.GamificationEngine
+import io.github.ducthinh0304.javainterviewprep.core.engine.gamification.XpCalculator
 import io.github.ducthinh0304.javainterviewprep.core.model.Difficulty
 import io.github.ducthinh0304.javainterviewprep.core.model.UserStats
 import kotlinx.coroutines.flow.Flow
@@ -46,14 +47,15 @@ class StatsRepository @Inject constructor(
 
     fun dailyActivity(date: LocalDate): Flow<DailyActivityEntity?> = dailyActivityDao.observe(date)
 
-    suspend fun recordAnswer(difficulty: Difficulty, isCorrect: Boolean): Pair<UserStats, Int> {
+    suspend fun recordAnswer(difficulty: Difficulty, isCorrect: Boolean, isDaily: Boolean = false): Pair<UserStats, Int> {
         val today = LocalDate.now(clock)
         val persisted = userStatsDao.get() ?: UserStatsEntity()
 
         val (updated, earnedXp) = gamificationEngine.applyAnswerResult(
             currentStats = persisted.toDomain(sessionStats.value),
             difficulty = difficulty,
-            isCorrect = isCorrect
+            isCorrect = isCorrect,
+            isDaily = isDaily
         )
 
         // Answering alone is not a check-in; the streak only moves in recordQuizCompleted().
@@ -79,13 +81,16 @@ class StatsRepository @Inject constructor(
 
     /**
      * Quizzes are unlimited per day. The first one completed on a day is that day's check-in
-     * (quizzesCompleted goes 0 -> 1) and is the only thing that moves the streak.
+     * (quizzesCompleted goes 0 -> 1) and is the only thing that moves the streak. The check-in
+     * pays `XpCalculator.checkInBonus(streak)`. Returns that bonus, or 0 if already checked in today.
      */
-    suspend fun recordQuizCompleted() = database.withTransaction {
+    suspend fun recordQuizCompleted(): Int = database.withTransaction {
         val today = LocalDate.now(clock)
         val activity = dailyActivityDao.get(today) ?: DailyActivityEntity(date = today)
-        dailyActivityDao.upsert(activity.copy(quizzesCompleted = activity.quizzesCompleted + 1))
-        if (activity.quizzesCompleted >= 1) return@withTransaction // already checked in today
+        if (activity.quizzesCompleted >= 1) { // already checked in today
+            dailyActivityDao.upsert(activity.copy(quizzesCompleted = activity.quizzesCompleted + 1))
+            return@withTransaction 0
+        }
 
         val persisted = userStatsDao.get() ?: UserStatsEntity()
         val (streak, longest) = gamificationEngine.calculateStreak(
@@ -94,7 +99,17 @@ class StatsRepository @Inject constructor(
             lastActiveEpochDay = persisted.lastActiveDate?.toEpochDay(),
             todayEpochDay = today.toEpochDay()
         )
-        userStatsDao.upsert(persisted.copy(currentStreak = streak, longestStreak = longest, lastActiveDate = today))
+        val bonus = XpCalculator.checkInBonus(streak)
+        dailyActivityDao.upsert(activity.copy(quizzesCompleted = 1, xpEarned = activity.xpEarned + bonus))
+        userStatsDao.upsert(
+            persisted.copy(
+                totalXp = persisted.totalXp + bonus,
+                currentStreak = streak,
+                longestStreak = longest,
+                lastActiveDate = today
+            )
+        )
+        bonus
     }
 
     private suspend fun recordDailyActivity(date: LocalDate, xpEarned: Int) {

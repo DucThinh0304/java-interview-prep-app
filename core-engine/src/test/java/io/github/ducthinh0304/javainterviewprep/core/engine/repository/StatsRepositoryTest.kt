@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import io.github.ducthinh0304.javainterviewprep.core.engine.db.EngineDatabase
 import io.github.ducthinh0304.javainterviewprep.core.engine.gamification.GamificationEngine
+import io.github.ducthinh0304.javainterviewprep.core.engine.gamification.XpCalculator
 import io.github.ducthinh0304.javainterviewprep.core.engine.testutil.MutableClock
 import io.github.ducthinh0304.javainterviewprep.core.model.Difficulty
 import kotlinx.coroutines.flow.first
@@ -69,6 +70,29 @@ class StatsRepositoryTest {
     }
 
     @Test
+    fun checkIn_paysAStreakScaledBonusOncePerDay() = runTest {
+        val paid = (1..10).map { day ->
+            if (day > 1) clock.advanceByDays(1)
+            repository.recordQuizCompleted().also {
+                assertEquals(0, repository.recordQuizCompleted()) // second quiz that day pays nothing
+            }
+        }
+
+        assertEquals(listOf(10, 15, 20, 25, 30, 35, 40, 45, 50, 50), paid)
+        assertEquals(paid.sum(), database.userStatsDao().get()?.totalXp)
+        assertEquals(50, repository.dailyActivity(LocalDate.now(clock)).first()?.xpEarned)
+    }
+
+    @Test
+    fun checkIn_bonusDropsBackAfterAMissedDay() = runTest {
+        repository.recordQuizCompleted()
+        clock.advanceByDays(1)
+        assertEquals(15, repository.recordQuizCompleted())
+        clock.advanceByDays(2)
+        assertEquals(10, repository.recordQuizCompleted())
+    }
+
+    @Test
     fun aDayWithoutACheckIn_resetsTheStreak() = runTest {
         repository.recordQuizCompleted()
         clock.advanceByDays(1)
@@ -108,15 +132,23 @@ class StatsRepositoryTest {
 
     @Test
     fun recordAnswer_accumulatesTotalXpAndTracksBestCombo() = runTest {
-        repository.recordAnswer(Difficulty.EASY, isCorrect = true) // combo x1.0, +10xp
-        clock.advanceByDays(1)
-        val (stats, _) = repository.recordAnswer(Difficulty.EASY, isCorrect = true) // combo x1.1, +11xp
+        repository.recordAnswer(Difficulty.EASY, isCorrect = true) // streak 1, x1 -> 10
+        repository.recordAnswer(Difficulty.EASY, isCorrect = true) // streak 2, x1 -> 10
+        val (stats, xp) = repository.recordAnswer(Difficulty.EASY, isCorrect = true) // streak 3, x1.5 -> 15
 
-        assertEquals(21, stats.xp)
+        assertEquals(15, xp)
+        assertEquals(35, stats.xp)
+        repository.recordAnswer(Difficulty.EASY, isCorrect = false) // resets combo, best is kept
 
         val persisted = database.userStatsDao().get()!!
-        assertEquals(21, persisted.totalXp)
-        assertEquals(1.2, persisted.bestCombo, 0.0001)
+        assertEquals(35, persisted.totalXp)
+        assertEquals(1.5, persisted.bestCombo, 0.0001)
+    }
+
+    @Test
+    fun recordAnswer_dailyAddsBonus() = runTest {
+        val (_, xp) = repository.recordAnswer(Difficulty.EASY, isCorrect = true, isDaily = true)
+        assertEquals(10 + XpCalculator.DAILY_BONUS, xp)
     }
 
     @Test
